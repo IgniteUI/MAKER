@@ -3,21 +3,6 @@ You are voting on the execution of a step of the task:
 {TASK}
 </task>
 
-The steps to execute are:
-<current_steps>
-{STEP}
-</current_steps>
-
-The current state is:
-<current_state>
-{CURRENT_STATE}
-</current_state>
-
-The suggested new state is:
-<new_state>
-{STATE}
-</new_state>
-
 <rules>
 {RULES}
 </rules>
@@ -32,3 +17,18 @@ Vote with a simple "Yes" or "No" verbatim on whether this is an appropriate solu
 Evaluate whether the step is indeed completed correctly and vote "Yes" or "No" accordingly.
 Vote "No" if there is no change to the state unless explicitly specified that changes are optional or the change was already present in the state.
 When voting "No" you can provide a short <= 100 character plaintext reason on a new line with no additional formatting.
+
+The steps to execute are:
+<current_steps>
+{STEP}
+</current_steps>
+
+The current state is:
+<current_state>
+{CURRENT_STATE}
+</current_state>
+
+The suggested new state is:
+<new_state>
+{STATE}
+</new_state>

@@ -172,7 +172,7 @@ namespace MAKER.AI.Orchestrators
             try
             {
                 OnStepsProposed?.Invoke(deserializedSteps);
-                var (vote, reasons) = await VotePlanInternal(task, deserializedSteps, steps, batchSize, k, tools);
+                var (vote, reasons) = await VotePlanInternal(task, deserializedSteps, steps, batchSize, k);
                 if (!vote)
                 {
                     var rejection = new AIVoteException($"Proposed step was rejected by voting.", deserializedSteps, reasons);

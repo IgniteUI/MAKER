@@ -106,12 +106,12 @@ namespace MAKER
         /// <param name="k">The difference in votes required for a voting decision to be made.</param>
         /// <param name="validators">A list of validators used to check for AI-generated red flags during execution. If null, no validation is performed.</param>
         /// <returns>The resulting state of the Step execution.</returns>
-        public async Task<string> Execute(IList<Step> steps, string prompt, int batchSize = 2, int k = 10, List<IAIRedFlagValidator> validators = null!)
+        public async Task<string> Execute(IList<Step> steps, string prompt, int batchSize = 2, int k = 10, List<IAIRedFlagValidator> validators = null!, object? tools = null!)
         {
             if (batchSize <= 0) throw new ArgumentOutOfRangeException($"{nameof(batchSize)} must be greater than zero");
             if (k <= 0) throw new ArgumentOutOfRangeException($"{nameof(k)} must be greater than zero");
 
-            return await _executionOrchestrator.Execute(steps, prompt, Format, batchSize, k, validators);
+            return await _executionOrchestrator.Execute(steps, prompt, Format, batchSize, k, validators, tools);
         }
 
         private IAIClient InstantiateClient(ClientProviderConfig config)
