@@ -3,6 +3,8 @@ Analyze the task requirements and come up with a VERY detailed step by step plan
 {TASK}
 </task>
 
+If there are any tools or MCP servers provided, you MUST use them if they are relevant to the task.
+
 Final output format:
 <format>
 {OUTPUT_FORMAT}
@@ -17,7 +19,7 @@ Step format:
 {PLAN_FORMAT}
 
 ALL of the following rules MUST be followed:
-{RULES}
+{PLAN_RULES}
 
 {LAST_REJECTION}
 

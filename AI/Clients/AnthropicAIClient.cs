@@ -1,6 +1,7 @@
 ﻿using Anthropic;
 using Anthropic.Exceptions;
 using Anthropic.Models.Messages;
+using MAKER.AI.Models;
 using MAKER.Configuration;
 
 namespace MAKER.AI.Clients
@@ -19,7 +20,7 @@ namespace MAKER.AI.Clients
             };
         }
 
-        public async Task<string?> Request(string prompt)
+        public async Task<AIResponse?> Request(string prompt, object? toolsObject = null)
         {
             MessageCreateParams parameters = new()
             {
@@ -40,7 +41,12 @@ namespace MAKER.AI.Clients
                 var response = await _client.Messages.Create(parameters);
                 response.Content[response.Content.Count - 1].TryPickText(out var text);
 
-                return text?.Text;
+                return new AIResponse()
+                {
+                    Content = text?.Text,
+                    InputTokens = (int)response.Usage.InputTokens,
+                    OutputTokens = (int)response.Usage.OutputTokens,
+                };
             }
             catch (AnthropicBadRequestException)
             {

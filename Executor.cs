@@ -89,12 +89,12 @@ namespace MAKER
         /// <param name="validators">An optional list of validators used to check for red flags in the generated steps. Each validator is applied
         /// to ensure the plan meets safety or compliance requirements.</param>
         /// <returns>A list of steps representing the generated plan.</returns>
-        public async Task<IList<Step>> Plan(string prompt, int batchSize = 2, int k = 10, IList<Step> prependSteps = null!, List<IAIRedFlagValidator> validators = null!)
+        public async Task<IList<Step>> Plan(string prompt, int batchSize = 2, int k = 10, IList<Step> prependSteps = null!, List<IAIRedFlagValidator> validators = null!, object? tools = null!)
         {
             if (batchSize <= 0) throw new ArgumentOutOfRangeException($"{nameof(batchSize)} must be greater than zero");
             if (k <= 0) throw new ArgumentOutOfRangeException($"{nameof(k)} must be greater than zero");
 
-            return await _planningOrchestrator.Plan(prompt, Format, batchSize, k, prependSteps, validators);
+            return await _planningOrchestrator.Plan(prompt, Format, batchSize, k, prependSteps, validators, tools);
         }
 
         /// <summary>

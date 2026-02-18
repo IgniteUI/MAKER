@@ -80,15 +80,19 @@ namespace MAKER.AI.Orchestrators
 
             prompt = ClearUnusedTemplateVariables(prompt);
 
-            var response = await GuardedRequest(prompt, executionClient, validators ?? []);
+            var response = await executionClient.GuardedRequest(prompt, validators ?? []);
+            if (string.IsNullOrEmpty(response.Content))
+            {
+                throw new AIRedFlagException("Execution client returned empty response.");
+            }
 
-            var (vote, reasons) = await VoteExecutionInternal(task, steps, response, state, k);
+            var (vote, reasons) = await VoteExecutionInternal(task, steps, response.Content, state, k);
             if (!vote)
             {
                 throw new AIVoteException($"Proposed step was rejected by voting.", steps, reasons);
             }
 
-            return response;
+            return response.Content;
         }
 
         public async Task<(bool, IEnumerable<string>)> VoteExecutionInternal(string task, IEnumerable<Step> proposed, string state, string prevState, int k = 5)
@@ -167,8 +171,8 @@ namespace MAKER.AI.Orchestrators
                 foreach (var bucket in TaskUtils.Interleaved(votes))
                 {
                     var t = await bucket;
-                    var voteResponse = await t;
-                    voteResponse = voteResponse.ReplaceLineEndings().Trim();
+                    var voteResponseObj = await t;
+                    var voteResponse = voteResponseObj.Content!.ReplaceLineEndings().Trim();
 
                     if (voteResponse != null)
                     {
@@ -226,34 +230,15 @@ namespace MAKER.AI.Orchestrators
             return (positive >= negative + k, reasons);
         }
 
-        private List<Task<string>> GenerateVoteRequests(string prompt, int amount, IAIClient client)
+        private List<Task<AIResponse>> GenerateVoteRequests(string prompt, int amount, IAIClient client)
         {
-            var output = new List<Task<string>>();
+            var output = new List<Task<AIResponse>>();
             for (int i = 0; i < amount; i++)
             {
-                output.Add(GuardedRequest(prompt, client, VoteValidators));
+                output.Add(client.GuardedRequest(prompt, VoteValidators));
             }
 
             return output;
-        }
-
-        private async Task<string> GuardedRequest(string prompt, IAIClient client, List<IAIRedFlagValidator> validators)
-        {
-            try
-            {
-                var response = await client.Request(prompt) ?? throw new AIRedFlagException("Received null response from the model.");
-
-                var jsonMatch = Regex.Match(response, @"```json\s*(.*?)\s*```", RegexOptions.Singleline);
-                response = jsonMatch.Success ? jsonMatch.Groups[1].Value.Trim() : response.Trim();
-
-                validators.ForEach(validator => validator.Validate(response));
-
-                return response;
-            }
-            catch (AIRedFlagException ex)
-            {
-                return await GuardedRequest($"{prompt}\n\nLast response was rejected:\n{ex.Message}", client, validators);
-            }
         }
 
         private async Task<string> ReadPromptTemplate(string path)

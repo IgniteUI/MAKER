@@ -30,11 +30,12 @@ namespace MAKER.AI.Orchestrators
 
         public int MaxRetries { get; set; } = 5;
 
-        public async Task<IList<Step>> Plan(string prompt, string format = "plaintext", int batchSize = 2, int k = 10, IList<Step> prependSteps = null!, List<IAIRedFlagValidator> validators = null!)
+        public async Task<IList<Step>> Plan(string prompt, string format = "plaintext", int batchSize = 2, int k = 10, IList<Step> prependSteps = null!, List<IAIRedFlagValidator> validators = null!, object? tools = null!)
         {
             var step = string.Empty;
             AIVoteException lastRejection = null!;
             int votingRetryCount = 0;
+
 
             if (string.IsNullOrEmpty(prompt))
             {
@@ -51,7 +52,7 @@ namespace MAKER.AI.Orchestrators
             {
                 try
                 {
-                    var proposedSteps = await PlanInternal(prompt, steps, batchSize, format, k, validators, lastRejection!);
+                    var proposedSteps = await PlanInternal(prompt, steps, batchSize, format, k, validators, lastRejection!, tools);
                     OnStepsAccepted?.Invoke(proposedSteps, [.. steps]);
 
                     foreach (var stepObj in proposedSteps)
@@ -93,13 +94,18 @@ namespace MAKER.AI.Orchestrators
                     }
                     continue;
                 }
+                catch (AIRedFlagException ex)
+                {
+                    lastRejection = new(ex.Message, VoteCancellationReason.Rejected);
+                    continue;
+                }
                 lastRejection = null!;
             }
 
             return steps;
         }
 
-        public async Task<List<Step>> PlanInternal(string task, IEnumerable<Step> steps, int batchSize = 2, string format = "plaintext", int k = 5, List<IAIRedFlagValidator> validators = null!, AIVoteException lastRejection = null!)
+        public async Task<List<Step>> PlanInternal(string task, IEnumerable<Step> steps, int batchSize = 2, string format = "plaintext", int k = 5, List<IAIRedFlagValidator> validators = null!, AIVoteException lastRejection = null!, object? tools = null!)
         {
             var planTemplate = await ReadPromptTemplate(config.Instructions.Plan);
             var planFormat = await ReadPromptTemplate(config.Instructions.PlanFormat);
@@ -108,11 +114,10 @@ namespace MAKER.AI.Orchestrators
             var prompt = planTemplate
                 .Replace("{TASK}", task)
                 .Replace("{STEPS}", string.Join(Environment.NewLine, steps.Select(s => "- " + s.Task)))
-                .Replace("{RULES}", rules)
+                .Replace("{PLAN_RULES}", rules)
                 .Replace("{OUTPUT_FORMAT}", format)
-                .Replace("{PLAN_FORMAT}", planFormat);
-
-            rules = rules.Replace("{BATCH_SIZE}", batchSize.ToString());
+                .Replace("{PLAN_FORMAT}", planFormat)
+                .Replace("{BATCH_SIZE}", batchSize.ToString());
 
             if (lastRejection != null)
             {
@@ -125,7 +130,9 @@ namespace MAKER.AI.Orchestrators
 
             validators ??= DefaultPlanningValidators;
 
-            var response = await GuardedRequest(prompt, planningClient, validators);
+            var responseObj = await planningClient.GuardedRequest(prompt, validators, tools);
+            var response = responseObj.Content ?? throw new AIRedFlagException("Received null response from the model.");
+
             if (response == "End")
             {
                 response = JsonSerializer.Serialize(new List<Step>() { new() { Task = "End", RequiredSteps = [] } });
@@ -165,7 +172,7 @@ namespace MAKER.AI.Orchestrators
             try
             {
                 OnStepsProposed?.Invoke(deserializedSteps);
-                var (vote, reasons) = await VotePlanInternal(task, deserializedSteps, steps, k);
+                var (vote, reasons) = await VotePlanInternal(task, deserializedSteps, steps, batchSize, k, tools);
                 if (!vote)
                 {
                     var rejection = new AIVoteException($"Proposed step was rejected by voting.", deserializedSteps, reasons);
@@ -188,7 +195,7 @@ namespace MAKER.AI.Orchestrators
             return deserializedSteps;
         }
 
-        public async Task<(bool, IEnumerable<string>)> VotePlanInternal(string task, IEnumerable<Step> proposed, IEnumerable<Step> steps, int k = 5)
+        public async Task<(bool, IEnumerable<string>)> VotePlanInternal(string task, IEnumerable<Step> proposed, IEnumerable<Step> steps, int batchSize = 2, int k = 5, object? tools = null)
         {
             var voteTemplate = await ReadPromptTemplate(config.Instructions.PlanVote);
             var planFormat = await ReadPromptTemplate(config.Instructions.PlanFormat);
@@ -198,24 +205,25 @@ namespace MAKER.AI.Orchestrators
                 .Replace("{TASK}", task)
                 .Replace("{STEP}", string.Join(Environment.NewLine, proposed.Select(s => $"  <step>{s.Task}</step>")))
                 .Replace("{STEPS}", string.Join(Environment.NewLine, steps.Select(s => $"  <step>{s.Task}</step>")))
-                .Replace("{RULES}", rules)
+                .Replace("{PLAN_RULES}", rules)
+                .Replace("{BATCH_SIZE}", batchSize.ToString())
                 .Replace("{PLAN_FORMAT}", planFormat);
 
             prompt = ClearUnusedTemplateVariables(prompt);
 
             try
             {
-                var (vote, reasons) = await this.RunVotingRound(k, prompt, planVotingClient);
+                var (vote, reasons) = await this.RunVotingRound(k, prompt, planVotingClient, tools);
                 return (vote, reasons);
             }
             catch
             {
-                var (vote, reasons) = await this.RunVotingRound(k, prompt, planVotingClient);
+                var (vote, reasons) = await this.RunVotingRound(k, prompt, planVotingClient, tools);
                 return (vote, reasons);
             }
         }
 
-        private async Task<(bool, IEnumerable<string>)> RunVotingRound(int k, string prompt, IAIClient client)
+        private async Task<(bool, IEnumerable<string>)> RunVotingRound(int k, string prompt, IAIClient client, object? tools = null)
         {
             int positive = 0;
             int negative = 0;
@@ -231,12 +239,12 @@ namespace MAKER.AI.Orchestrators
                     throw new AIVoteException("Voting round exceeded maximum number of votes without reaching consensus.", VoteCancellationReason.Contentious);
                 }
 
-                var votes = GenerateVoteRequests(prompt, k, client);
+                var votes = GenerateVoteRequests(prompt, k, client, tools);
                 foreach (var bucket in TaskUtils.Interleaved(votes))
                 {
                     var t = await bucket;
-                    var voteResponse = await t;
-                    voteResponse = voteResponse.ReplaceLineEndings().Trim();
+                    var voteResponseObj = await t;
+                    var voteResponse = voteResponseObj.Content!.ReplaceLineEndings().Trim();
 
                     if (voteResponse != null)
                     {
@@ -260,7 +268,7 @@ namespace MAKER.AI.Orchestrators
                         else
                         {
                             // Some other non-value
-                            votes.AddRange(GenerateVoteRequests(prompt, 1, client));
+                            votes.AddRange(GenerateVoteRequests(prompt, 1, client, tools));
                             continue;
                         }
 
@@ -294,34 +302,15 @@ namespace MAKER.AI.Orchestrators
             return (positive >= negative + k, reasons);
         }
 
-        private List<Task<string>> GenerateVoteRequests(string prompt, int amount, IAIClient client)
+        private List<Task<AIResponse>> GenerateVoteRequests(string prompt, int amount, IAIClient client, object? tools = null)
         {
-            var output = new List<Task<string>>();
+            var output = new List<Task<AIResponse>>();
             for (int i = 0; i < amount; i++)
             {
-                output.Add(GuardedRequest(prompt, client, VoteValidators));
+                output.Add(client.GuardedRequest(prompt, VoteValidators, tools));
             }
 
             return output;
-        }
-
-        private async Task<string> GuardedRequest(string prompt, IAIClient client, List<IAIRedFlagValidator> validators)
-        {
-            try
-            {
-                var response = await client.Request(prompt) ?? throw new AIRedFlagException("Received null response from the model.");
-
-                var jsonMatch = Regex.Match(response, @"```json\s*(.*?)\s*```", RegexOptions.Singleline);
-                response = jsonMatch.Success ? jsonMatch.Groups[1].Value.Trim() : response.Trim();
-
-                validators.ForEach(validator => validator.Validate(response));
-
-                return response;
-            }
-            catch (AIRedFlagException ex)
-            {
-                return await GuardedRequest($"{prompt}\n\nLast response was rejected:\n{ex.Message}", client, validators);
-            }
         }
 
         private async Task<string> ReadPromptTemplate(string path)
