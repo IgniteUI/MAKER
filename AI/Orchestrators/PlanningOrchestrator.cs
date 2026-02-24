@@ -9,27 +9,75 @@ using System.Text.RegularExpressions;
 
 namespace MAKER.AI.Orchestrators
 {
+    /// <summary>
+    /// Orchestrates the AI-powered planning phase of the MAKER pipeline. Generates plan steps
+    /// in batches using a planning AI client, then validates each batch through a k-margin
+    /// consensus voting system using a separate voting AI client. Handles rejections with
+    /// automatic retry and feedback to the planning model.
+    /// </summary>
     public class PlanningOrchestrator(ExecutorConfig config, IAIClient planningClient, IAIClient planVotingClient)
     {
         #region Events
+        /// <summary>
+        /// Raised when a batch of proposed steps passes the voting round and is accepted into the plan.
+        /// Parameters: (newly accepted steps, previously accepted steps).
+        /// </summary>
         public Action<IList<Step>, IList<Step>> OnStepsAccepted { get; set; } = delegate { };
+
+        /// <summary>
+        /// Raised when the planning AI produces a batch of proposed steps, before they enter voting.
+        /// </summary>
         public Action<IList<Step>> OnStepsProposed { get; set; } = delegate { };
+
+        /// <summary>
+        /// Raised whenever an individual vote is received during a plan voting round, providing the current tally.
+        /// </summary>
         public Action<VoteState> OnVoteChanged { get; set; } = delegate { };
+
+        /// <summary>
+        /// Raised when a batch of proposed steps is rejected by the voting round.
+        /// </summary>
         public Action<AIVoteException> OnStepsRejected { get; set; } = delegate { };
         #endregion
 
+        /// <summary>
+        /// Gets or sets the default list of red-flag validators applied to planning AI responses.
+        /// By default, requires a minimum response length of 100 characters.
+        /// </summary>
         public List<IAIRedFlagValidator> DefaultPlanningValidators { get; set; } =
         [
             new AIRedFlagMinLengthValidator(100),
         ];
 
+        /// <summary>
+        /// Gets or sets the list of red-flag validators applied to voting AI responses.
+        /// By default, requires a minimum response length of 2 characters (enough for "Yes" / "No" / "End").
+        /// </summary>
         protected static List<IAIRedFlagValidator> VoteValidators { get; set; } =
         [
             new AIRedFlagMinLengthValidator(2),
         ];
 
+        /// <summary>
+        /// Gets or sets the maximum number of consecutive voting rejections before the planner
+        /// restarts the planning process from scratch (clearing all accumulated steps).
+        /// </summary>
         public int MaxRetries { get; set; } = 5;
 
+        /// <summary>
+        /// Generates a complete plan by iteratively requesting step batches from the planning AI,
+        /// voting on each batch, and accumulating accepted steps until the AI signals completion ("End").
+        /// On voting rejection, the rejection reasons are fed back to the planner. If rejections exceed
+        /// <see cref="MaxRetries"/>, the entire plan is discarded and planning restarts from scratch.
+        /// </summary>
+        /// <param name="prompt">The task description that guides the planning AI.</param>
+        /// <param name="format">The output format label injected into the prompt template.</param>
+        /// <param name="batchSize">The number of steps to request in each planning batch.</param>
+        /// <param name="k">The k-margin threshold for the voting consensus system.</param>
+        /// <param name="prependSteps">Optional pre-defined steps to include at the beginning of the plan.</param>
+        /// <param name="validators">Optional red-flag validators; defaults to <see cref="DefaultPlanningValidators"/> if null.</param>
+        /// <param name="tools">Optional tools object whose methods the planning AI can invoke during generation.</param>
+        /// <returns>The complete list of accepted plan steps.</returns>
         public async Task<IList<Step>> Plan(string prompt, string format = "plaintext", int batchSize = 2, int k = 10, IList<Step> prependSteps = null!, List<IAIRedFlagValidator> validators = null!, object? tools = null!)
         {
             var step = string.Empty;
@@ -105,6 +153,22 @@ namespace MAKER.AI.Orchestrators
             return steps;
         }
 
+        /// <summary>
+        /// Generates a single batch of plan steps by rendering the planning prompt template,
+        /// sending it to the planning AI, deserializing the JSON response into <see cref="Step"/> objects,
+        /// and submitting them for voting approval.
+        /// </summary>
+        /// <param name="task">The task description for the prompt template.</param>
+        /// <param name="steps">The steps already accepted in the plan (provided as context to the AI).</param>
+        /// <param name="batchSize">The number of steps to request in this batch.</param>
+        /// <param name="format">The output format label for the prompt template.</param>
+        /// <param name="k">The k-margin threshold for voting.</param>
+        /// <param name="validators">Red-flag validators to apply to the AI response.</param>
+        /// <param name="lastRejection">The previous rejection exception, if any, whose reasons are fed back to the AI.</param>
+        /// <param name="tools">Optional tools object for the planning AI.</param>
+        /// <returns>The list of proposed steps that passed the voting round.</returns>
+        /// <exception cref="AIRedFlagException">Thrown when the AI response is malformed or fails validation.</exception>
+        /// <exception cref="AIVoteException">Thrown when the proposed steps are rejected by the voting system.</exception>
         public async Task<List<Step>> PlanInternal(string task, IEnumerable<Step> steps, int batchSize = 2, string format = "plaintext", int k = 5, List<IAIRedFlagValidator> validators = null!, AIVoteException lastRejection = null!, object? tools = null!)
         {
             var planTemplate = await ReadPromptTemplate(config.Instructions.Plan);
@@ -195,6 +259,17 @@ namespace MAKER.AI.Orchestrators
             return deserializedSteps;
         }
 
+        /// <summary>
+        /// Submits proposed plan steps to the voting AI for approval. Renders the vote prompt template
+        /// and delegates to <see cref="RunVotingRound"/> to collect and tally votes.
+        /// </summary>
+        /// <param name="task">The task description for context in the vote prompt.</param>
+        /// <param name="proposed">The proposed steps being voted on.</param>
+        /// <param name="steps">The steps already accepted in the plan (for context).</param>
+        /// <param name="batchSize">The batch size used in planning (included in the vote prompt).</param>
+        /// <param name="k">The k-margin threshold for voting consensus.</param>
+        /// <param name="tools">Optional tools object for the voting AI.</param>
+        /// <returns>A tuple of (approved, rejection reasons, token usage).</returns>
         public async Task<(bool, IEnumerable<string>, AIResponse)> VotePlanInternal(string task, IEnumerable<Step> proposed, IEnumerable<Step> steps, int batchSize = 2, int k = 5, object? tools = null)
         {
             var voteTemplate = await ReadPromptTemplate(config.Instructions.PlanVote);
@@ -223,6 +298,18 @@ namespace MAKER.AI.Orchestrators
             }
         }
 
+        /// <summary>
+        /// Runs a k-margin consensus voting round by sending parallel vote requests to the voting AI.
+        /// Votes are tallied as they arrive (using completion-order interleaving). The round ends when
+        /// "Yes" leads "No" by k votes, "No" leads "Yes" by k votes, or all k votes are "End".
+        /// If the total vote count exceeds 4×k without consensus, a contentious exception is thrown.
+        /// </summary>
+        /// <param name="k">The k-margin threshold for consensus.</param>
+        /// <param name="prompt">The rendered vote prompt to send to each voting request.</param>
+        /// <param name="client">The AI client to use for voting.</param>
+        /// <param name="tools">Optional tools object for the voting AI.</param>
+        /// <returns>A tuple of (approved, rejection reasons, cumulative token usage).</returns>
+        /// <exception cref="AIVoteException">Thrown when voting ends (all "End" votes) or exceeds the maximum vote count.</exception>
         private async Task<(bool, IEnumerable<string>, AIResponse)> RunVotingRound(int k, string prompt, IAIClient client, object? tools = null)
         {
             int positive = 0;
@@ -312,6 +399,15 @@ namespace MAKER.AI.Orchestrators
             });
         }
 
+        /// <summary>
+        /// Creates the specified number of parallel vote request tasks using the given AI client and prompt.
+        /// Each request is sent through <see cref="IAIClientExtensions.GuardedRequest"/> with vote validators.
+        /// </summary>
+        /// <param name="prompt">The vote prompt to send.</param>
+        /// <param name="amount">The number of parallel vote requests to create.</param>
+        /// <param name="client">The AI client to use for voting.</param>
+        /// <param name="tools">Optional tools object for the voting AI.</param>
+        /// <returns>A list of tasks representing the pending vote responses.</returns>
         private List<Task<AIResponse>> GenerateVoteRequests(string prompt, int amount, IAIClient client, object? tools = null)
         {
             var output = new List<Task<AIResponse>>();
@@ -323,6 +419,12 @@ namespace MAKER.AI.Orchestrators
             return output;
         }
 
+        /// <summary>
+        /// Reads a prompt template file from disk. The path is resolved relative to the current working directory.
+        /// </summary>
+        /// <param name="path">The relative file path to the prompt template.</param>
+        /// <returns>The full text content of the template file.</returns>
+        /// <exception cref="FileNotFoundException">Thrown when the template file does not exist.</exception>
         private async Task<string> ReadPromptTemplate(string path)
         {
             path = Path.Combine(Directory.GetCurrentDirectory(), path);
@@ -333,6 +435,12 @@ namespace MAKER.AI.Orchestrators
             return await File.ReadAllTextAsync(path);
         }
 
+        /// <summary>
+        /// Removes any unreplaced template placeholders (e.g., {LAST_REJECTION}, {EXTRA_CONTEXT})
+        /// from the prompt string. Placeholders follow the pattern <c>{UPPER_CASE_NAME}</c>.
+        /// </summary>
+        /// <param name="prompt">The prompt string potentially containing unreplaced placeholders.</param>
+        /// <returns>The prompt with all unreplaced placeholders removed.</returns>
         private string ClearUnusedTemplateVariables(string prompt)
         {
             var regex = new Regex(@"\{[A-Z_]+\}");

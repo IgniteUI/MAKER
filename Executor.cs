@@ -7,51 +7,86 @@ using MAKER.Configuration;
 
 namespace MAKER
 {
+    /// <summary>
+    /// The main entry point for the MAKER AI orchestration pipeline. Coordinates the full
+    /// Plan → Vote → Execute → Vote workflow by delegating to the <see cref="PlanningOrchestrator"/>
+    /// and <see cref="ExecutionOrchestrator"/>. Instantiates the appropriate AI clients based on
+    /// configuration and exposes event callbacks for monitoring pipeline progress.
+    /// </summary>
     public class Executor
     {
         private readonly ExecutorConfig _config;
         private readonly PlanningOrchestrator _planningOrchestrator;
         private readonly ExecutionOrchestrator _executionOrchestrator;
 
+        /// <summary>
+        /// Gets or sets the output format label (e.g., "Standard XML", "plaintext") that is injected
+        /// into prompt templates to instruct the AI model on the desired response format.
+        /// </summary>
         public string Format { get; set; } = "plaintext";
 
         #region Events
+        /// <summary>
+        /// Raised when a batch of plan steps has been accepted by the voting system.
+        /// The first parameter contains the newly accepted steps; the second contains previously accepted steps.
+        /// </summary>
         public Action<IList<Step>, IList<Step>> OnStepsAdded
         {
             get => _planningOrchestrator.OnStepsAccepted;
             set => _planningOrchestrator.OnStepsAccepted = value;
         }
 
+        /// <summary>
+        /// Raised when a batch of plan steps has been proposed by the planning AI and is about to be voted on.
+        /// </summary>
         public Action<IList<Step>> OnStepsProposed
         {
             get => _planningOrchestrator.OnStepsProposed;
             set => _planningOrchestrator.OnStepsProposed = value;
         }
 
+        /// <summary>
+        /// Raised when a batch of proposed plan steps has been rejected by the voting system.
+        /// The exception contains the rejected steps and the reasons for rejection.
+        /// </summary>
         public Action<AIVoteException> OnStepsRejected
         {
             get => _planningOrchestrator.OnStepsRejected;
             set => _planningOrchestrator.OnStepsRejected = value;
         }
 
+        /// <summary>
+        /// Raised whenever a plan voting round receives a new vote, providing the current vote tally.
+        /// </summary>
         public Action<VoteState> OnPlanVoteChanged
         {
             get => _planningOrchestrator.OnVoteChanged;
             set => _planningOrchestrator.OnVoteChanged = value;
         }
 
+        /// <summary>
+        /// Raised when execution of a batch of steps begins.
+        /// The first parameter contains the current batch; the second contains previously completed steps.
+        /// </summary>
         public Action<IList<Step>, IList<Step>> OnExecutionStarted
         {
             get => _executionOrchestrator.OnExecutionStarted;
             set => _executionOrchestrator.OnExecutionStarted = value;
         }
 
+        /// <summary>
+        /// Raised when the cumulative execution state changes after a step batch is completed.
+        /// The string parameter contains the full current state as returned by the execution AI.
+        /// </summary>
         public Action<string> OnStateChanged
         {
             get => _executionOrchestrator.OnStateChanged;
             set => _executionOrchestrator.OnStateChanged = value;
         }
 
+        /// <summary>
+        /// Raised whenever an execution voting round receives a new vote, providing the current vote tally.
+        /// </summary>
         public Action<VoteState> OnExecutionVoteChanged
         {
             get => _executionOrchestrator.OnVoteChanged;
@@ -59,12 +94,23 @@ namespace MAKER
         }
         #endregion
 
+        /// <summary>
+        /// Gets or sets the default list of red-flag validators applied during planning.
+        /// These validators check AI-generated plan output for quality issues before it proceeds to voting.
+        /// </summary>
         public List<IAIRedFlagValidator> DefaultPlanningValidators
         {
             get => _planningOrchestrator.DefaultPlanningValidators;
             set => _planningOrchestrator.DefaultPlanningValidators = value;
         }
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="Executor"/> class with the specified configuration and output format.
+        /// Creates the AI clients for each pipeline stage (planning, plan voting, execution, execution voting)
+        /// and instantiates the planning and execution orchestrators.
+        /// </summary>
+        /// <param name="config">The executor configuration containing AI provider keys, client assignments, and instruction paths.</param>
+        /// <param name="format">The output format label injected into prompts (e.g., "Standard XML").</param>
         public Executor(ExecutorConfig config, string format)
         {
             _config = config;
@@ -114,6 +160,13 @@ namespace MAKER
             return await _executionOrchestrator.Execute(steps, prompt, Format, batchSize, k, validators, tools);
         }
 
+        /// <summary>
+        /// Creates an <see cref="IAIClient"/> instance based on the provider name in the given configuration.
+        /// Supports "OpenAI", "Google", and "Anthropic" providers.
+        /// </summary>
+        /// <param name="config">The client provider configuration specifying the provider name and model.</param>
+        /// <returns>An <see cref="IAIClient"/> instance configured for the specified provider and model.</returns>
+        /// <exception cref="NotImplementedException">Thrown when the provider name is not recognized.</exception>
         private IAIClient InstantiateClient(ClientProviderConfig config)
         {
             var type = config.Provider;
