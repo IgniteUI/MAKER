@@ -9,7 +9,7 @@ using System.Text.RegularExpressions;
 
 namespace MAKER.AI.Orchestrators
 {
-    public class ExecutionOrchestrator(ExecutorConfig config, IAIClient executionClient, IAIClient executionVotingClient)
+    public class ExecutionOrchestrator(ExecutorConfig config, AIClientBase executionClient, AIClientBase executionVotingClient)
     {
 
         #region Events

@@ -114,7 +114,7 @@ namespace MAKER
             return await _executionOrchestrator.Execute(steps, prompt, Format, batchSize, k, validators, tools);
         }
 
-        private IAIClient InstantiateClient(ClientProviderConfig config)
+        private AIClientBase InstantiateClient(ClientProviderConfig config)
         {
             var type = config.Provider;
             var model = config.Model;

@@ -1,22 +1,22 @@
-using System.Reflection;
-using System.Text.Json;
 using Anthropic;
 using Anthropic.Models.Messages;
 using MAKER.AI.Models;
 using MAKER.Configuration;
 
+using System.Text.Json;
+
 namespace MAKER.AI.Clients
 {
-    internal class AnthropicAIClient(ExecutorConfig config, string model) : IAIClient
+    internal class AnthropicAIClient(ExecutorConfig config, string model) : AIClientBase
     {
         private readonly AnthropicClient _client = new() { APIKey = config.AIProviderKeys.Anthropic };
         private readonly Model _model = Enum.Parse<Model>(model);
 
-        public async Task<AIResponse?> Request(string prompt, object? toolsObject = null)
+        protected override async Task<AIResponse?> RequestInternal(string prompt, List<AIFunctionInfo>? tools = null)
         {
             List<MessageParam> messages = [new() { Role = Role.User, Content = prompt }];
 
-            List<ToolUnion>? tools = toolsObject != null ? GenerateTools(toolsObject) : null;
+            List<ToolUnion>? toolUnions = tools != null ? BuildToolUnions(tools) : null;
 
             int inputTokens = 0;
             int outputTokens = 0;
@@ -25,13 +25,13 @@ namespace MAKER.AI.Clients
             do
             {
                 requiresAction = false;
-                var request = await _client.Messages.Create(tools != null
+                var request = await _client.Messages.Create(toolUnions != null
                     ? new MessageCreateParams
                     {
                         MaxTokens = 8192,
                         Messages = messages,
                         Model = _model,
-                        Tools = tools,
+                        Tools = toolUnions,
                         ToolChoice = new ToolChoice(new ToolChoiceAuto()),
                     }
                     : new MessageCreateParams
@@ -64,62 +64,40 @@ namespace MAKER.AI.Clients
                             foreach (var block in request.Content)
                             {
                                 if (!block.TryPickToolUse(out var toolUse))
-                                {
                                     continue;
-                                }
 
-                                if (toolsObject != null)
+                                var inputJson = JsonSerializer.Serialize(toolUse.Input);
+
+                                try
                                 {
-                                    var method = toolsObject.GetType().GetMethod(toolUse.Name, BindingFlags.Public | BindingFlags.Instance)
-                                        ?? throw new Exception($"Tool call for {toolUse.Name} failed: no such method found on tools object.");
+                                    var result = InvokeTool(toolUse.Name, inputJson);
 
-                                    var parameters = method.GetParameters();
-                                    var args = new List<object?>();
-
-                                    var inputJson = JsonSerializer.Serialize(toolUse.Input);
-                                    using JsonDocument argumentsJson = JsonDocument.Parse(inputJson);
-
-                                    foreach (var param in parameters)
+                                    messages.Add(new MessageParam
                                     {
-                                        if (argumentsJson.RootElement.TryGetProperty(param.Name!, out var argValue))
+                                        Role = Role.User,
+                                        Content = new MessageParamContent([new ContentBlockParam(new ToolResultBlockParam
                                         {
-                                            args.Add(Convert.ChangeType(argValue.GetRawText().Trim('"', ' ', '\n'), param.ParameterType));
-                                        }
-                                        else
-                                        {
-                                            throw new Exception($"Tool call for {toolUse.Name} failed: missing argument {param.Name}.");
-                                        }
-                                    }
-
-                                    try
+                                            ToolUseID = toolUse.ID,
+                                            Content = new ToolResultBlockParamContent(result),
+                                        })]),
+                                    });
+                                }
+                                catch (Exception ex)
+                                {
+                                    var inner = ex.InnerException ?? ex;
+                                    messages.Add(new MessageParam
                                     {
-                                        var result = method.Invoke(toolsObject, [.. args]);
-
-                                        messages.Add(new MessageParam
+                                        Role = Role.User,
+                                        Content = new MessageParamContent([new ContentBlockParam(new ToolResultBlockParam
                                         {
-                                            Role = Role.User,
-                                            Content = new MessageParamContent([new ContentBlockParam(new ToolResultBlockParam
-                                            {
-                                                ToolUseID = toolUse.ID,
-                                                Content = new ToolResultBlockParamContent(result?.ToString() ?? string.Empty),
-                                            })]),
-                                        });
-                                    }
-                                    catch (Exception ex)
-                                    {
-                                        messages.Add(new MessageParam
-                                        {
-                                            Role = Role.User,
-                                            Content = new MessageParamContent([new ContentBlockParam(new ToolResultBlockParam
-                                            {
-                                                ToolUseID = toolUse.ID,
-                                                Content = new ToolResultBlockParamContent(
-                                                    $"[ERROR] [{ex.InnerException?.GetType().Name}]: {ex.InnerException?.Message}"),
-                                            })]),
-                                        });
-                                    }
+                                            ToolUseID = toolUse.ID,
+                                            Content = new ToolResultBlockParamContent(
+                                                $"[ERROR] [{inner.GetType().Name}]: {inner.Message}"),
+                                        })]),
+                                    });
                                 }
 
+                                // TODO: MCP, code exec, file search, etc
                                 requiresAction = true;
                             }
 
@@ -177,33 +155,28 @@ namespace MAKER.AI.Clients
             return content;
         }
 
-        private List<ToolUnion> GenerateTools(object toolsObject)
+        private static List<ToolUnion> BuildToolUnions(List<AIFunctionInfo> functions)
         {
             List<ToolUnion> tools = [];
-            var objectType = toolsObject.GetType();
 
-            var methods = objectType.GetMethods(BindingFlags.Public | BindingFlags.Instance | BindingFlags.Static | BindingFlags.DeclaredOnly);
-            foreach (var method in methods)
+            foreach (var fn in functions)
             {
-                var parameters = method.GetParameters();
-                var description = method.GetCustomAttributes<AIDescription>().FirstOrDefault()?.Description;
-
                 InputSchema inputSchema;
 
-                if (parameters.Length > 0)
+                if (fn.Parameters.Count > 0)
                 {
                     inputSchema = new InputSchema
                     {
                         Type = JsonSerializer.Deserialize<JsonElement>(@"""object"""),
-                        Properties = parameters.ToDictionary(
-                            p => p.Name!,
+                        Properties = fn.Parameters.ToDictionary(
+                            p => p.Name,
                             p => JsonSerializer.Deserialize<JsonElement>(JsonSerializer.Serialize(new
                             {
                                 type = p.ParameterType == typeof(string) ? "string" : "number",
-                                description = p.GetCustomAttributes<AIDescription>().FirstOrDefault()?.Description ?? string.Empty
+                                description = p.Description
                             }))
                         ),
-                        Required = parameters.Where(p => !p.IsOptional).Select(p => p.Name!).ToList(),
+                        Required = fn.Parameters.Where(p => p.IsRequired).Select(p => p.Name).ToList(),
                     };
                 }
                 else
@@ -216,8 +189,8 @@ namespace MAKER.AI.Clients
 
                 tools.Add(new ToolUnion(new Tool
                 {
-                    Name = method.Name,
-                    Description = description,
+                    Name = fn.Name,
+                    Description = string.IsNullOrEmpty(fn.Description) ? null : fn.Description,
                     InputSchema = inputSchema,
                 }));
             }
