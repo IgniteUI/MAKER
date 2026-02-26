@@ -1,0 +1,24 @@
+{
+  "_comment": "Paste the 'mcpServers' block into your claude_desktop_config.json.",
+  "_configLocation": {
+    "windows": "%APPDATA%\\Claude\\claude_desktop_config.json",
+    "macOS":   "~/Library/Application Support/Claude/claude_desktop_config.json"
+  },
+  "mcpServers": {
+    "maker": {
+      "command": "dotnet",
+      "args": [
+        "run",
+        "--project",
+        "D:\\Repos\\MAKER\\MAKER.McpServer\\MAKER.McpServer.csproj",
+        "--",
+        "--stdio"
+      ],
+      "env": {
+        "Executor__AIProviderKeys__Anthropic": "<your-anthropic-key>",
+        "Executor__AIProviderKeys__OpenAI":    "<your-openai-key>",
+        "Executor__AIProviderKeys__Google":    "<your-google-key>"
+      }
+    }
+  }
+}
