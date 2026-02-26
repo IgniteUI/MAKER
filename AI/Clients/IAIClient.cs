@@ -8,10 +8,14 @@ namespace MAKER.AI.Clients
     public interface IAIClient
     {
         /// <summary>
-        /// Sends the specified prompt and asynchronously returns the generated response as a string.
+        /// Sends the specified prompt and asynchronously returns the AI-generated response.
         /// </summary>
         /// <param name="prompt">The prompt text to send for processing.</param>
-        /// <returns>A string response from the AI model.</returns>
+        /// <param name="toolsObject">
+        /// An optional object whose public methods are exposed to the model as callable tools.
+        /// Methods decorated with <see cref="AIDescription"/> provide descriptions to the model.
+        /// </param>
+        /// <returns>The AI response, or <c>null</c> if no response was produced.</returns>
         Task<AIResponse?> Request(string prompt, object? toolsObject = null);
     }
 }
