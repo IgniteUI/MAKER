@@ -17,7 +17,7 @@ namespace MAKER.AI.Orchestrators
         public event Action<string>? OnStateChanged;
         #endregion
 
-        public async Task<string> Execute(IList<Step> steps, string prompt, string format, int batchSize = 2, int k = 10, List<IAIRedFlagValidator>? validators = null, object? tools = null, CancellationToken cancellationToken = default)
+        public async Task<string> Execute(IList<Step> steps, string prompt, string format, int batchSize = 2, int k = 10, List<IAIRedFlagValidator>? validators = null, object? tools = null, List<MCPServerInfo>? mcpServers = null, CancellationToken cancellationToken = default)
         {
             var completedSteps = new List<Step>();
             var stepsList = steps.ToList();
@@ -34,7 +34,7 @@ namespace MAKER.AI.Orchestrators
                     var batchSteps = stepsList.Skip(batchIndex * batchSize).Take(batchSize).ToList();
 
                     OnExecutionStarted?.Invoke(batchSteps, completedSteps);
-                    state = await ExecuteSteps(prompt, format, state, batchSteps, k, validators, tools, cancellationToken: cancellationToken);
+                    state = await ExecuteSteps(prompt, format, state, batchSteps, k, validators, tools, mcpServers, cancellationToken: cancellationToken);
 
                     OnStateChanged?.Invoke(state);
 
@@ -45,7 +45,7 @@ namespace MAKER.AI.Orchestrators
             return state;
         }
 
-        internal async Task<string> ExecuteStepsInternal(string task, string state, string format, IEnumerable<Step> steps, int k = 5, List<IAIRedFlagValidator>? validators = null, object? tools = null, AIVoteException? lastRejection = null, CancellationToken cancellationToken = default)
+        internal async Task<string> ExecuteStepsInternal(string task, string state, string format, IEnumerable<Step> steps, int k = 5, List<IAIRedFlagValidator>? validators = null, object? tools = null, List<MCPServerInfo>? mcpServers = null, AIVoteException? lastRejection = null, CancellationToken cancellationToken = default)
         {
             var executionTemplate = await ReadPromptTemplate(config.Instructions.Execute, cancellationToken);
             var rules = await ReadPromptTemplate(config.Instructions.ExecuteRules, cancellationToken);
@@ -74,13 +74,13 @@ namespace MAKER.AI.Orchestrators
 
             prompt = ClearUnusedTemplateVariables(prompt);
 
-            var response = await executionClient.GuardedRequest(prompt, validators ?? [], tools, cancellationToken);
+            var response = await executionClient.GuardedRequest(prompt, validators ?? [], tools, mcpServers, cancellationToken);
             if (string.IsNullOrEmpty(response.Content))
             {
                 throw new AIRedFlagException("Execution client returned empty response.");
             }
 
-            var (vote, reasons) = await VoteExecutionInternal(task, steps, response.Content, state, k, tools, cancellationToken);
+            var (vote, reasons) = await VoteExecutionInternal(task, steps, response.Content, state, k, tools, mcpServers, cancellationToken);
             if (!vote)
             {
                 throw new AIVoteException($"Proposed step was rejected by voting.", steps, reasons);
@@ -89,7 +89,7 @@ namespace MAKER.AI.Orchestrators
             return response.Content;
         }
 
-        internal async Task<(bool, IEnumerable<string>)> VoteExecutionInternal(string task, IEnumerable<Step> proposed, string state, string prevState, int k = 5, object? tools = null, CancellationToken cancellationToken = default)
+        internal async Task<(bool, IEnumerable<string>)> VoteExecutionInternal(string task, IEnumerable<Step> proposed, string state, string prevState, int k = 5, object? tools = null, List<MCPServerInfo>? mcpServers = null, CancellationToken cancellationToken = default)
         {
             var voteTemplate = await ReadPromptTemplate(config.Instructions.ExecuteVote, cancellationToken);
             var rules = await ReadPromptTemplate(config.Instructions.ExecuteRules, cancellationToken);
@@ -103,11 +103,11 @@ namespace MAKER.AI.Orchestrators
 
             prompt = ClearUnusedTemplateVariables(prompt);
 
-            var (vote, reasons, _) = await RunVotingRound(k, prompt, executionVotingClient, tools, cancellationToken);
+            var (vote, reasons, _) = await RunVotingRound(k, prompt, executionVotingClient, tools, mcpServers, cancellationToken);
             return (vote, reasons);
         }
 
-        private async Task<string> ExecuteSteps(string prompt, string format, string state, IEnumerable<Step> steps, int k, List<IAIRedFlagValidator>? validators = null, object? tools = null, AIVoteException? lastRejection = null, CancellationToken cancellationToken = default)
+        private async Task<string> ExecuteSteps(string prompt, string format, string state, IEnumerable<Step> steps, int k, List<IAIRedFlagValidator>? validators = null, object? tools = null, List<MCPServerInfo>? mcpServers = null, AIVoteException ? lastRejection = null, CancellationToken cancellationToken = default)
         {
             int votingRetryCount = 0;
             var currentState = state;
@@ -116,7 +116,7 @@ namespace MAKER.AI.Orchestrators
             {
                 try
                 {
-                    return await ExecuteStepsInternal(prompt, currentState, format, steps, k, validators, tools, lastRejection, cancellationToken);
+                    return await ExecuteStepsInternal(prompt, currentState, format, steps, k, validators, tools, mcpServers, lastRejection, cancellationToken);
                 }
                 catch (AIVoteException ex)
                 {
@@ -128,7 +128,7 @@ namespace MAKER.AI.Orchestrators
                     {
                         lastRejection = null;
                         currentState = string.Empty;
-                        return await ExecuteStepsInternal(prompt, currentState, format, steps, k, validators, tools, null, cancellationToken);
+                        return await ExecuteStepsInternal(prompt, currentState, format, steps, k, validators, tools, mcpServers, null, cancellationToken);
                     }
                 }
             }

@@ -11,7 +11,7 @@ namespace MAKER.AI.Clients
     {
         private readonly Client _client = new(apiKey: config.AIProviderKeys.Google);
 
-        protected override async Task<AIResponse?> RequestInternal(string prompt, List<AIFunctionInfo>? tools = null, object? toolsObject = null, CancellationToken cancellationToken = default)
+        protected override async Task<AIResponse?> RequestInternal(string prompt, List<AIFunctionInfo>? tools = null, object? toolsObject = null, List<MCPServerInfo>? mcpServers = null, CancellationToken cancellationToken = default)
         {
             var contents = new List<Content>
             {

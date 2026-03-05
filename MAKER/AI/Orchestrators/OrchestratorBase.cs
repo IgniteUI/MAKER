@@ -22,7 +22,7 @@ namespace MAKER.AI.Orchestrators
 
         private static readonly ConcurrentDictionary<string, string> _templateCache = new();
 
-        protected async Task<(bool Vote, IEnumerable<string> Reasons, AIResponse Usage)> RunVotingRound(int k, string prompt, IAIClient client, object? tools = null, CancellationToken cancellationToken = default)
+        protected async Task<(bool Vote, IEnumerable<string> Reasons, AIResponse Usage)> RunVotingRound(int k, string prompt, IAIClient client, object? tools = null, List<MCPServerInfo>? mcpServers = null, CancellationToken cancellationToken = default)
         {
             int positive = 0;
             int negative = 0;
@@ -41,7 +41,7 @@ namespace MAKER.AI.Orchestrators
                     throw new AIVoteException("Voting round exceeded maximum number of votes without reaching consensus.", VoteCancellationReason.Contentious);
                 }
 
-                var votes = GenerateVoteRequests(prompt, k, client, tools, cancellationToken);
+                var votes = GenerateVoteRequests(prompt, k, client, tools, mcpServers, cancellationToken);
                 foreach (var bucket in TaskUtils.Interleaved(votes))
                 {
                     var t = await bucket;
@@ -73,7 +73,7 @@ namespace MAKER.AI.Orchestrators
                         else
                         {
                             // Some other non-value
-                            votes.AddRange(GenerateVoteRequests(prompt, 1, client, tools, cancellationToken));
+                            votes.AddRange(GenerateVoteRequests(prompt, 1, client, tools, mcpServers, cancellationToken));
                             continue;
                         }
 
@@ -111,12 +111,12 @@ namespace MAKER.AI.Orchestrators
             });
         }
 
-        protected List<Task<AIResponse>> GenerateVoteRequests(string prompt, int amount, IAIClient client, object? tools = null, CancellationToken cancellationToken = default)
+        protected List<Task<AIResponse>> GenerateVoteRequests(string prompt, int amount, IAIClient client, object? tools = null, List<MCPServerInfo>? mcpServers = null, CancellationToken cancellationToken = default)
         {
             var output = new List<Task<AIResponse>>();
             for (int i = 0; i < amount; i++)
             {
-                output.Add(client.GuardedRequest(prompt, VoteValidators, tools, cancellationToken));
+                output.Add(client.GuardedRequest(prompt, VoteValidators, tools, mcpServers, cancellationToken));
             }
 
             return output;

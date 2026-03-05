@@ -23,11 +23,11 @@ namespace MAKER
         /// <summary>
         /// Generates a sequence of plan Steps based on the specified prompt and configuration parameters.
         /// </summary>
-        Task<IList<Step>> Plan(string prompt, int batchSize = 2, int k = 10, IList<Step>? prependSteps = null, List<IAIRedFlagValidator>? validators = null, object? tools = null, CancellationToken cancellationToken = default);
+        Task<IList<Step>> Plan(string prompt, int batchSize = 2, int k = 10, IList<Step>? prependSteps = null, List<IAIRedFlagValidator>? validators = null, object? tools = null, List<MCPServerInfo>? mcpServers = null, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Executes a sequence of steps using the specified prompt and returns the resulting state as a string.
         /// </summary>
-        Task<string> Execute(IList<Step> steps, string prompt, int batchSize = 2, int k = 10, List<IAIRedFlagValidator>? validators = null, object? tools = null, CancellationToken cancellationToken = default);
+        Task<string> Execute(IList<Step> steps, string prompt, int batchSize = 2, int k = 10, List<IAIRedFlagValidator>? validators = null, object? tools = null, List<MCPServerInfo>? mcpServers = null, CancellationToken cancellationToken = default);
     }
 }

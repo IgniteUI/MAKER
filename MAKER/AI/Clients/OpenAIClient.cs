@@ -1,7 +1,7 @@
 using MAKER.AI.Models;
 using MAKER.Configuration;
 using OpenAI.Chat;
-
+using OpenAI.Responses;
 using System.Text.Json;
 
 #pragma warning disable OPENAI001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
@@ -9,27 +9,32 @@ namespace MAKER.AI.Clients
 {
     internal sealed class OpenAIClient(ExecutorConfig config, string model, bool priority = false) : AIClientBase
     {
-        private readonly ChatClient _client = new(model: model, apiKey: config.AIProviderKeys.OpenAI);
+        private readonly ResponsesClient _client = new(config.AIProviderKeys.OpenAI);
 
-        protected override async Task<AIResponse?> RequestInternal(string prompt, List<AIFunctionInfo>? tools = null, object? toolsObject = null, CancellationToken cancellationToken = default)
+        protected override async Task<AIResponse?> RequestInternal(string prompt, List<AIFunctionInfo>? tools = null, object? toolsObject = null, List<MCPServerInfo>? mcpServers = null, CancellationToken cancellationToken = default)
         {
-            var opts = new ChatCompletionOptions();
-
-            if (priority)
+            var opts = new CreateResponseOptions()
             {
-                opts.ServiceTier = new ChatServiceTier("priority");
-            }
-
-            List<ChatMessage> messages = [new UserChatMessage(prompt)];
+                Model = model
+            };
 
             if (tools != null)
             {
                 var chatTools = GenerateTools(tools);
                 chatTools.ForEach(t => opts.Tools.Add(t));
-                opts.AllowParallelToolCalls = true;
             }
 
-            opts.ReasoningEffortLevel = ChatReasoningEffortLevel.Low;
+            if (mcpServers != null)
+            {
+                foreach (var server in mcpServers)
+                {
+                    opts.Tools.Add(ResponseTool.CreateMcpTool(server.Name, server.Url, server.ApiKey ?? null, server.Description, toolCallApprovalPolicy: new McpToolCallApprovalPolicy(GlobalMcpToolCallApprovalPolicy.NeverRequireApproval)));
+                }
+            }
+
+            opts.InputItems.Add(
+                ResponseItem.CreateUserMessageItem(prompt)
+            );
 
             //#pragma warning disable SCME0001
             //  opts.Patch.Set("$.prompt_cache_retention"u8, "24h");
@@ -38,10 +43,12 @@ namespace MAKER.AI.Clients
             int inputTokens = 0;
             int outputTokens = 0;
             bool requiresAction = false;
+            ResponseResult? responseResult = null;
             do
             {
                 requiresAction = false;
-                var request = await _client.CompleteChatAsync(messages, opts, cancellationToken);
+                var request = await _client.CreateResponseAsync(opts, cancellationToken);
+                responseResult = request.Value;
 
                 if (request.Value == null)
                 {
@@ -51,75 +58,77 @@ namespace MAKER.AI.Clients
                 inputTokens += request.Value.Usage.InputTokenCount;
                 outputTokens += request.Value.Usage.OutputTokenCount;
 
-                switch (request.Value.FinishReason)
-                {
-                    case ChatFinishReason.ToolCalls:
-                        {
-                            messages.Add(new AssistantChatMessage(request.Value));
+                
 
-                            foreach (ChatToolCall toolCall in request.Value.ToolCalls)
-                            {
-                                try
-                                {
-                                    var result = InvokeTool(toolCall.FunctionName, toolCall.FunctionArguments.ToString(), toolsObject!);
+                //switch (request.Value.)
+                //{
+                //    case ChatFinishReason.ToolCalls:
+                //        {
+                //            messages.Add(new AssistantChatMessage(request.Value));
 
-                                    messages.Add(new ToolChatMessage(
-                                        toolCall.Id,
-                                        result
-                                    ));
-                                }
-                                catch (Exception ex)
-                                {
-                                    messages.Add(new ToolChatMessage(
-                                        toolCall.Id,
-                                        FormatToolError(ex)
-                                    ));
-                                }
+                //            foreach (ChatToolCall toolCall in request.Value.ToolCalls)
+                //            {
+                //                try
+                //                {
+                //                    var result = InvokeTool(toolCall.FunctionName, toolCall.FunctionArguments.ToString(), toolsObject!);
 
-                                // TODO: MCP, code exec, file search, etc
-                                requiresAction = true;
-                            }
+                //                    messages.Add(new ToolChatMessage(
+                //                        toolCall.Id,
+                //                        result
+                //                    ));
+                //                }
+                //                catch (Exception ex)
+                //                {
+                //                    messages.Add(new ToolChatMessage(
+                //                        toolCall.Id,
+                //                        FormatToolError(ex)
+                //                    ));
+                //                }
 
-                            break;
-                        }
+                //                // TODO: MCP, code exec, file search, etc
+                //                requiresAction = true;
+                //            }
 
-                    case ChatFinishReason.Stop:
-                        {
-                            messages.Add(new AssistantChatMessage(request.Value));
-                            break;
-                        }
+                //            break;
+                //        }
 
-                    case ChatFinishReason.Length:
-                        throw new InvalidOperationException("Incomplete model output due to MaxTokens parameter or token limit exceeded.");
+                //    case ChatFinishReason.Stop:
+                //        {
+                //            messages.Add(new AssistantChatMessage(request.Value));
+                //            break;
+                //        }
 
-                    case ChatFinishReason.ContentFilter:
-                        throw new InvalidOperationException("Omitted content due to a content filter flag.");
+                //    case ChatFinishReason.Length:
+                //        throw new InvalidOperationException("Incomplete model output due to MaxTokens parameter or token limit exceeded.");
 
-                    case ChatFinishReason.FunctionCall:
-                        throw new InvalidOperationException("Deprecated in favor of tool calls.");
+                //    case ChatFinishReason.ContentFilter:
+                //        throw new InvalidOperationException("Omitted content due to a content filter flag.");
 
-                    default:
-                        throw new InvalidOperationException(request.Value.FinishReason.ToString());
-                }
+                //    case ChatFinishReason.FunctionCall:
+                //        throw new InvalidOperationException("Deprecated in favor of tool calls.");
+
+                //    default:
+                //        throw new InvalidOperationException(request.Value.FinishReason.ToString());
+                //}
 
             } while (requiresAction);
 
-            if (messages.Count <= 1)
+            if (responseResult == null)
             {
                 return null;
             }
 
             return new AIResponse()
             {
-                Content = messages.Last().Content[0].Text,
+                Content = responseResult.GetOutputText(),
                 InputTokens = inputTokens,
                 OutputTokens = outputTokens
             };
         }
 
-        private List<ChatTool> GenerateTools(List<AIFunctionInfo> functions)
+        private List<ResponseTool> GenerateTools(List<AIFunctionInfo> functions)
         {
-            List<ChatTool> tools = [];
+            List<ResponseTool> tools = [];
 
             foreach (var function in functions)
             {
@@ -146,10 +155,11 @@ namespace MAKER.AI.Clients
                     paramData = BinaryData.FromString(json);
                 }
 
-                var tool = ChatTool.CreateFunctionTool(
+                var tool = ResponseTool.CreateFunctionTool(
                     functionName: function.Name,
                     functionDescription: function.Description,
-                    functionParameters: paramData
+                    functionParameters: paramData,
+                    strictModeEnabled: false
                 );
 
                 tools.Add(tool);

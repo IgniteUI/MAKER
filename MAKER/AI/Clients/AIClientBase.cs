@@ -14,7 +14,7 @@ namespace MAKER.AI.Clients
 
         public int MaxGuardedRetries { get; set; } = 3;
 
-        public async Task<AIResponse?> Request(string prompt, object? toolsObject = null, CancellationToken cancellationToken = default)
+        public async Task<AIResponse?> Request(string prompt, object? toolsObject = null, List<MCPServerInfo>? mcpServers = null, CancellationToken cancellationToken = default)
         {
             List<AIFunctionInfo>? functions = null;
             if (toolsObject != null)
@@ -28,7 +28,7 @@ namespace MAKER.AI.Clients
             {
                 try
                 {
-                    return await RequestInternal(prompt, tools, toolsObject, cancellationToken);
+                    return await RequestInternal(prompt, tools, toolsObject, mcpServers, cancellationToken);
                 }
                 catch (Exception ex) when (attempt < MaxRequestRetries && IsTransientError(ex, out int delayMs))
                 {
@@ -50,16 +50,16 @@ namespace MAKER.AI.Clients
             return false;
         }
 
-        public Task<AIResponse> GuardedRequest(string prompt, List<IAIRedFlagValidator> validators, object? tools = null, CancellationToken cancellationToken = default)
+        public Task<AIResponse> GuardedRequest(string prompt, List<IAIRedFlagValidator> validators, object? tools = null, List<MCPServerInfo>? mcpServers = null, CancellationToken cancellationToken = default)
         {
-            return GuardedRequestInternal(prompt, validators, tools, MaxGuardedRetries, cancellationToken);
+            return GuardedRequestInternal(prompt, validators, tools, mcpServers, MaxGuardedRetries, cancellationToken);
         }
 
-        private async Task<AIResponse> GuardedRequestInternal(string prompt, List<IAIRedFlagValidator> validators, object? tools, int remainingRetries, CancellationToken cancellationToken)
+        private async Task<AIResponse> GuardedRequestInternal(string prompt, List<IAIRedFlagValidator> validators, object? tools, List<MCPServerInfo>? mcpServers, int remainingRetries, CancellationToken cancellationToken)
         {
             try
             {
-                var responseObj = await Request(prompt, tools, cancellationToken) ?? throw new AIRedFlagException("Received null response from the model.");
+                var responseObj = await Request(prompt, tools, mcpServers, cancellationToken) ?? throw new AIRedFlagException("Received null response from the model.");
                 var response = responseObj.Content ?? throw new AIRedFlagException("Received response with null content from the model.");
 
                 var jsonMatch = JsonCodeBlockRegex().Match(response);
@@ -77,11 +77,11 @@ namespace MAKER.AI.Clients
             catch (AIRedFlagException ex)
             {
                 if (remainingRetries <= 0) throw;
-                return await GuardedRequestInternal($"{prompt}\n\nLast response was rejected:\n{ex.Message}", validators, tools, remainingRetries - 1, cancellationToken);
+                return await GuardedRequestInternal($"{prompt}\n\nLast response was rejected:\n{ex.Message}", validators, tools, mcpServers, remainingRetries - 1, cancellationToken);
             }
         }
 
-        protected abstract Task<AIResponse?> RequestInternal(string prompt, List<AIFunctionInfo>? tools = null, object? toolsObject = null, CancellationToken cancellationToken = default);
+        protected abstract Task<AIResponse?> RequestInternal(string prompt, List<AIFunctionInfo>? tools = null, object? toolsObject = null, List<MCPServerInfo>? mcpServers = null, CancellationToken cancellationToken = default);
 
         protected static string FormatToolError(Exception ex)
         {
@@ -168,7 +168,8 @@ namespace MAKER.AI.Clients
                         ParameterType = p.ParameterType,
                         Description = p.GetCustomAttributes<AIDescription>().FirstOrDefault()?.Description ?? string.Empty,
                         IsRequired = !p.IsOptional
-                    })]
+                    })],
+                    Info = method
                 };
 
                 functionInfos.Add(functionInfo);
