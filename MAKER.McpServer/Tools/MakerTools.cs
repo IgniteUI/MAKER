@@ -19,7 +19,7 @@ public class MakerTools(ExecutorService executorService)
         CancellationToken cancellationToken = default)
     {
         var executor = executorService.CreateWithProgress(progress);
-        var steps = await executor.Plan(prompt, batchSize, k);
+        var steps = await executor.Plan(prompt, batchSize, k, cancellationToken: cancellationToken);
         return JsonSerializer.Serialize(steps, new JsonSerializerOptions { WriteIndented = true });
     }
 
@@ -37,7 +37,7 @@ public class MakerTools(ExecutorService executorService)
             ?? throw new ArgumentException("Invalid steps JSON");
 
         var executor = executorService.CreateWithProgress(progress);
-        return await executor.Execute(steps, prompt, batchSize, k);
+        return await executor.Execute(steps, prompt, batchSize, k, cancellationToken: cancellationToken);
     }
 
     [McpServerTool(Name = "maker_plan_and_execute")]
@@ -52,9 +52,9 @@ public class MakerTools(ExecutorService executorService)
         var executor = executorService.CreateWithProgress(progress);
 
         progress?.Report(JsonSerializer.Serialize(new SseEvent("phase", "Planning...")));
-        var steps = await executor.Plan(prompt, batchSize, k);
+        var steps = await executor.Plan(prompt, batchSize, k, cancellationToken: cancellationToken);
 
         progress?.Report(JsonSerializer.Serialize(new SseEvent("phase", $"Executing {steps.Count} steps...")));
-        return await executor.Execute(steps, prompt, batchSize, k);
+        return await executor.Execute(steps, prompt, batchSize, k, cancellationToken: cancellationToken);
     }
 }
