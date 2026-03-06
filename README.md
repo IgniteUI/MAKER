@@ -207,3 +207,82 @@ The framework employs multiple layers of error correction:
 
 The framework balances speed and reliability through these tunable parameters, adapting to different use cases from high-stakes tasks requiring zero errors to rapid prototyping scenarios.
 
+## Use as MCP Server
+
+The easiest way to use MAKER is via the published npm package, which runs the MCP server in any MCP-compatible client (Claude Desktop, VS Code, Cursor, etc.) with no .NET installation required.
+
+### Prerequisites
+
+- **Node.js ≥ 18**
+- At least one AI provider API key (OpenAI, Anthropic, or Google AI)
+- A **GitHub Personal Access Token** with `read:packages` scope ([create one here](https://github.com/settings/tokens))
+
+### One-time registry setup
+
+This package is published on GitHub Packages. Run these once on your machine:
+
+```bash
+npm config set @igniteui:registry https://npm.pkg.github.com
+```
+
+Then open `~/.npmrc` (Windows: `%USERPROFILE%\.npmrc`) and add:
+
+```
+//npm.pkg.github.com/:_authToken=YOUR_GITHUB_PAT
+```
+
+### Claude Desktop
+
+Open `%APPDATA%\Claude\claude_desktop_config.json` (Windows) or `~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) and add:
+
+```json
+{
+  "mcpServers": {
+    "maker": {
+      "command": "npx",
+      "args": ["-y", "@igniteui/maker-mcp", "--stdio"],
+      "env": {
+        "Executor__AIProviderKeys__OpenAI": "<your-openai-key>"
+      }
+    }
+  }
+}
+```
+
+Fully quit and relaunch Claude Desktop. On first start, the native binary (~50 MB) is downloaded and cached — subsequent starts are instant.
+
+### VS Code (GitHub Copilot)
+
+Create `.vscode/mcp.json` in your workspace:
+
+```json
+{
+  "servers": {
+    "maker": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@igniteui/maker-mcp", "--stdio"],
+      "env": {
+        "Executor__AIProviderKeys__OpenAI": "<your-openai-key>"
+      }
+    }
+  }
+}
+```
+
+Switch Copilot Chat to **Agent** mode and click the 🔧 tools icon to confirm `maker_plan`, `maker_execute`, and `maker_plan_and_execute` are listed.
+
+### Available tools
+
+| Tool | Description |
+|---|---|
+| `maker_plan` | Decompose a task into a validated, ordered step list |
+| `maker_execute` | Execute a step list produced by `maker_plan` |
+| `maker_plan_and_execute` | Plan and execute in one call with live progress |
+
+For full configuration options see the [npm package README](MAKER.Npm/README.md). Notable things you can tune:
+
+- **Mix AI providers per role** — use Claude for planning and GPT-4o-mini for voting to balance quality and cost
+- **Model selection** — independently configure which model handles Planning, PlanVoting, Execution, and ExecutionVoting
+- **Consensus threshold (`k`)** — raise it for more conservative, token-heavy decisions; lower it for faster, lighter tasks
+- **Batch size** — control how many steps are proposed or executed per round
