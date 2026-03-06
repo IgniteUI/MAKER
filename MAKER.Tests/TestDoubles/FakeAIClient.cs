@@ -7,7 +7,7 @@ namespace MAKER.Tests.TestDoubles
     {
         public Queue<AIResponse?> Responses { get; } = new();
 
-        protected override Task<AIResponse?> RequestInternal(string prompt, List<AIFunctionInfo>? tools = null, object? toolsObject = null, CancellationToken cancellationToken = default)
+        protected override Task<AIResponse?> RequestInternal(string prompt, List<AIFunctionInfo>? tools = null, object? toolsObject = null, List<MCPServerInfo>? mcpServers = null,  CancellationToken cancellationToken = default)
         {
             if (Responses.Count == 0)
                 throw new InvalidOperationException("No more responses configured in FakeAIClient.");

@@ -4,6 +4,7 @@
 
 The state will persist across all operations and will be used as input for the next step.
 The solution will be voted on by other agents and will be rejected if the rules are not followed.
+Execute the `current_steps` ONLY! The `task` is for reference only and should not be executed.
 
 <task>
 {TASK}

@@ -1,6 +1,5 @@
 using MAKER.AI.Models;
 using MAKER.Configuration;
-using OpenAI.Chat;
 using OpenAI.Responses;
 using System.Text.Json;
 

@@ -13,7 +13,7 @@ Steps should only change one thing at a time!
 If the step provides examples or suggestions - vote "No".
 If the step already exists in the previous steps - vote "No".
 If there is already a step that accomplishes the final output generation and all conditions of the task are satisfied - vote "Yes".
-If the plan is deemed sufficiently detailed and complete - vote "Yes".
+If the plan is deemed sufficiently detailed and complete - vote "End".
 Steps should NOT repeat. Reject anything containing repeated steps.
 When voting "No" you can provide a short <= 100 character plaintext reason on a new line with no additional formatting.
 "Yes" and "End" need to be verbatim with no other output.

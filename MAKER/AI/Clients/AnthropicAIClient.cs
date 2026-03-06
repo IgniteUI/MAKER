@@ -1,10 +1,8 @@
 using Anthropic;
-using Anthropic.Models.Messages;
 using MAKER.AI.Models;
 using MAKER.Configuration;
 using Microsoft.Extensions.AI;
 using ModelContextProtocol.Client;
-using System.Text.Json;
 
 namespace MAKER.AI.Clients
 {
@@ -14,10 +12,10 @@ namespace MAKER.AI.Clients
 
         protected override async Task<AIResponse?> RequestInternal(string prompt, List<AIFunctionInfo>? tools = null, object? toolsObject = null, List<MCPServerInfo>? mcpServers = null, CancellationToken cancellationToken = default)
         {
-            List<AITool> aiTools = [];
-
             int inputTokens = 0;
             int outputTokens = 0;
+
+            List<AITool> aiTools = [];
 
             foreach (var server in mcpServers ?? [])
             {
