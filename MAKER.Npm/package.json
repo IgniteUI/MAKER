@@ -7,12 +7,12 @@
   },
   "files": [
     "bin/maker-mcp.js",
-    "README.md",
     "CHANGELOG.md"
   ],
   "scripts": {
     "test": "node test/prepublish.test.js",
-    "prepublishOnly": "npm test"
+    "prepublishOnly": "npm test",
+    "prepack": "copy ..\\README.md .\\README.md"
   },
   "engines": {
     "node": ">=18"
@@ -25,5 +25,6 @@
   "license": "MIT",
   "publishConfig": {
     "registry": "https://npm.pkg.github.com"
-  }
+  },
+  "readme": "README.md"
 }
