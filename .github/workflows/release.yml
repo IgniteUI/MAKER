@@ -134,6 +134,10 @@ jobs:
           npm version "$VERSION" --no-git-tag-version --allow-same-version
         working-directory: MAKER.Npm
 
+      - name: Update registry
+        run: npm pkg set publishConfig.registry=https://registry.npmjs.org/
+        working-directory: MAKER.Npm
+        
       - name: Publish
         run: |
           if [[ "${GITHUB_REF_NAME}" == *"-alpha"* || "${GITHUB_REF_NAME}" == *"-beta"* || "${GITHUB_REF_NAME}" == *"-rc"* ]]; then
