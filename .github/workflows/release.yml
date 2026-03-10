@@ -118,6 +118,9 @@ jobs:
     name: Publish to NpmJS.org
     needs: release
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write # Required for OIDC
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -126,6 +129,10 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org/'
+
+      # Ensure npm 11.5.1 or later is installed in order to npm OIDC to work
+      - name: Update npm
+        run: npm install -g npm@latest
 
       # Sync package.json version with the git tag (strips the 'v' prefix)
       - name: Set version
@@ -141,10 +148,8 @@ jobs:
       - name: Publish
         run: |
           if [[ "${GITHUB_REF_NAME}" == *"-alpha"* || "${GITHUB_REF_NAME}" == *"-beta"* || "${GITHUB_REF_NAME}" == *"-rc"* ]]; then
-            npm publish --access public --tag next
+            npm publish --tag next
           else
-            npm publish --access public
+            npm publish
           fi
         working-directory: MAKER.Npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPMJS_TOKEN }}
