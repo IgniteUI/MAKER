@@ -104,7 +104,12 @@ jobs:
         working-directory: MAKER.Npm
 
       - name: Publish
-        run: npm publish
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == *"-alpha"* || "${GITHUB_REF_NAME}" == *"-beta"* || "${GITHUB_REF_NAME}" == *"-rc"* ]]; then
+            npm publish --tag next
+          else
+            npm publish
+          fi
         working-directory: MAKER.Npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -114,9 +119,6 @@ jobs:
     name: Publish to NpmJS.org
     needs: release
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
 
     steps:
       - uses: actions/checkout@v4
@@ -126,7 +128,7 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org/'
           scope: '@igniteui'
-          
+
       # Sync package.json version with the git tag (strips the 'v' prefix)
       - name: Set version
         run: |
@@ -134,13 +136,13 @@ jobs:
           npm version "$VERSION" --no-git-tag-version --allow-same-version
         working-directory: MAKER.Npm
 
-      - name: Update registry in package.json
-        run: |
-          npm pkg set publishConfig.registry=https://registry.npmjs.org/
-        working-directory: MAKER.Npm
-        
       - name: Publish
-        run: npm publish
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == *"-alpha"* || "${GITHUB_REF_NAME}" == *"-beta"* || "${GITHUB_REF_NAME}" == *"-rc"* ]]; then
+            npm publish --access public --tag next
+          else
+            npm publish --access public
+          fi
         working-directory: MAKER.Npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPMJS_TOKEN }}
