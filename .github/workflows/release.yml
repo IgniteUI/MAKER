@@ -94,7 +94,6 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://npm.pkg.github.com'
-          scope: '@igniteui'
 
       # Sync package.json version with the git tag (strips the 'v' prefix)
       - name: Set version
@@ -127,7 +126,6 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org/'
-          scope: '@igniteui'
 
       # Sync package.json version with the git tag (strips the 'v' prefix)
       - name: Set version
