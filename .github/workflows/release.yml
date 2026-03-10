@@ -94,12 +94,18 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://npm.pkg.github.com'
+          scope: '@igniteui'
 
       # Sync package.json version with the git tag (strips the 'v' prefix)
       - name: Set version
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
           npm version "$VERSION" --no-git-tag-version --allow-same-version
+        working-directory: MAKER.Npm
+
+      # Scope the package name for GitHub Packages (required - GH Packages only accepts scoped packages)
+      - name: Scope package name
+        run: npm pkg set name='@igniteui/igniteui-quorum-ai'
         working-directory: MAKER.Npm
 
       - name: Publish
@@ -112,14 +118,13 @@ jobs:
         working-directory: MAKER.Npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        
+
   # ── Publish npm package to npmjs ─────────────────────────────────
   publish-npmjs:
     name: Publish to NpmJS.org
     needs: release
     runs-on: ubuntu-latest
     permissions:
-      id-token: write # Required for OIDC
       contents: read
 
     steps:
@@ -130,10 +135,6 @@ jobs:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org/'
 
-      # Ensure npm 11.5.1 or later is installed in order to npm OIDC to work
-      - name: Update npm
-        run: npm install -g npm@latest
-
       # Sync package.json version with the git tag (strips the 'v' prefix)
       - name: Set version
         run: |
@@ -141,15 +142,13 @@ jobs:
           npm version "$VERSION" --no-git-tag-version --allow-same-version
         working-directory: MAKER.Npm
 
-      - name: Update registry
-        run: npm pkg set publishConfig.registry=https://registry.npmjs.org/
-        working-directory: MAKER.Npm
-        
       - name: Publish
         run: |
           if [[ "${GITHUB_REF_NAME}" == *"-alpha"* || "${GITHUB_REF_NAME}" == *"-beta"* || "${GITHUB_REF_NAME}" == *"-rc"* ]]; then
-            npm publish --tag next
+            npm publish --access public --tag next
           else
-            npm publish
+            npm publish --access public
           fi
         working-directory: MAKER.Npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPMJS_TOKEN }}

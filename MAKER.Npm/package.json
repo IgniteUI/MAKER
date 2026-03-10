@@ -23,8 +23,5 @@
     "url": "https://github.com/IgniteUI/igniteui-quorum-ai"
   },
   "keywords": ["mcp", "ai", "llm", "planning", "execution", "agentic", "maker", "igniteui-quorum-ai"],
-  "license": "MIT",
-  "publishConfig": {
-    "registry": "https://npm.pkg.github.com"
-  }
+  "license": "MIT"
 }
