@@ -55,7 +55,7 @@ jobs:
           # Bundle binary + appsettings + instruction files into a tarball
           tar -czf maker-mcp-${{ matrix.rid }}.tar.gz -C ./dist .
   test:
-    name: Build ${{ matrix.rid }}
+    name: Test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
