@@ -18,7 +18,7 @@ const path     = require('path');
 const os       = require('os');
 const { execSync, spawn } = require('child_process');
 
-const GITHUB_REPO = 'IgniteUI/MAKER';
+const GITHUB_REPO = 'IgniteUI/igniteui-quorum-ai';
 const VERSION     = require('../package.json').version;
 
 // ── Platform detection ──────────────────────────────────────────────────────

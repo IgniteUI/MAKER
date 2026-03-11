@@ -2,7 +2,7 @@
 'use strict';
 
 /**
- * Pre-publish integration test for @igniteui/maker-mcp.
+ * Pre-publish integration test for igniteui-quorum-ai
  *
  * What it verifies:
  *   1. `npm pack` produces a tarball with the expected files.
@@ -123,8 +123,13 @@ withTmpDir(packDir => {
       // ── 4. Bootstrap script is runnable ──────────────────────────────────
       console.log('\n4. Bootstrap script smoke-test');
 
+      // derive path from the actual package name, handles both scoped and unscoped
+      const pkgInstallDir = pkg.name.startsWith('@')
+        ? path.join(...pkg.name.split('/'))   // '@igniteui/maker-mcp' → ['@igniteui', 'maker-mcp']
+        : pkg.name;                           // 'igniteui-quorum-ai'  → 'igniteui-quorum-ai'
+
       const scriptPath = path.join(
-        installDir, 'node_modules', '@igniteui', 'maker-mcp', 'bin', 'maker-mcp.js'
+        installDir, 'node_modules', pkgInstallDir, 'bin', 'maker-mcp.js'
       );
       assert(fs.existsSync(scriptPath), 'maker-mcp.js is present after install');
 
