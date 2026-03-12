@@ -6,11 +6,11 @@ namespace MAKER.AI.Clients
     {
         public IAIClient CreateClient(ClientProviderConfig config)
         {
-            return config.Provider switch
+            return config.Provider.ToUpperInvariant() switch
             {
-                "OpenAI" => new OpenAIClient(executorConfig, config.Model),
-                "Google" => new GoogleAIClient(executorConfig, config.Model),
-                "Anthropic" => new AnthropicAIClient(executorConfig, config.Model),
+                "OPENAI" => new OpenAIClient(executorConfig, config.Model),
+                "GOOGLE" => new GoogleAIClient(executorConfig, config.Model),
+                "ANTHROPIC" => new AnthropicAIClient(executorConfig, config.Model),
                 _ => throw new NotSupportedException($"AI provider '{config.Provider}' is not supported."),
             };
         }
