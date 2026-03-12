@@ -1,3 +1,4 @@
+using MAKER.AI.Models;
 using Microsoft.Extensions.Configuration;
 
 namespace MAKER.Configuration
@@ -7,6 +8,7 @@ namespace MAKER.Configuration
         public required AIProviderKeysConfig AIProviderKeys { get; set; }
         public required ClientsConfig Clients { get; set; }
         public required InstructionsConfig Instructions { get; set; }
+        public List<MCPServerInfo> McpServers { get; set; } = [];
 
         public static ExecutorConfig FromConfiguration(IConfigurationSection section)
         {

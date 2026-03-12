@@ -345,6 +345,46 @@ Valid `Provider` values: `OpenAI`, `Anthropic`, `Google`.
 }
 ```
 
+#### MCP Servers
+
+MAKER can connect to external MCP servers as tool providers. Each entry requires a name, description, and URL; an API key is optional.
+
+| Environment Variable | Description |
+|---|---|
+| `Executor__McpServers__0__Name` | Display name of the first MCP server |
+| `Executor__McpServers__0__Description` | Short description of what the server provides |
+| `Executor__McpServers__0__Url` | Base URL of the MCP server |
+| `Executor__McpServers__0__ApiKey` | *(Optional)* API key for authenticating with the server |
+
+Increment the index (`0`, `1`, `2`, …) to add more servers.
+
+**Example — register two MCP servers:**
+
+```json
+"env": {
+  "Executor__McpServers__0__Name":        "code-search",
+  "Executor__McpServers__0__Description": "Semantic code search over the monorepo",
+  "Executor__McpServers__0__Url":         "https://code-search.internal.example.com",
+  "Executor__McpServers__0__ApiKey":      "sk-search-...",
+  "Executor__McpServers__1__Name":        "docs",
+  "Executor__McpServers__1__Description": "Company documentation retrieval",
+  "Executor__McpServers__1__Url":         "https://docs-mcp.internal.example.com"
+}
+```
+
+Or in `appsettings.json`:
+
+```json
+"McpServers": [
+  {
+    "Name": "code-search",
+    "Description": "Semantic code search over the monorepo",
+    "Url": "https://code-search.internal.example.com",
+    "ApiKey": "sk-search-..."
+  }
+]
+```
+
 #### Tuning Parameters
 
 Each MCP tool call accepts optional parameters to control execution behavior:
