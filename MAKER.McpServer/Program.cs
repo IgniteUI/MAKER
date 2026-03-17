@@ -1,6 +1,3 @@
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using MAKER.McpServer.Api;
 using MAKER.McpServer.Services;
 using MAKER.McpServer.Tools;
