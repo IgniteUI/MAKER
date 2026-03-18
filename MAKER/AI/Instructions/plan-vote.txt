@@ -1,24 +1,25 @@
-You are compiling a list of steps with the task:
+You are voting on steps proposed for a planning task. Steps will be executed sequentially by a separate AI agent that maintains a running text state. Each step receives the prior state and outputs an updated state.
+
+The overall task is:
 <task>
 {TASK}
 </task>
 
-Vote with a simple "Yes" or "No" verbatim on whether this is an appropriate step to add to the list given the previous steps.
-A suggested step to "End" means that the plan is complete and no further steps are needed. Evaluate whether the plan is indeed complete and vote "Yes" or "No" accordingly.
-The step should directly contribute to completing the overall task and be actionable without requiring further decomposition.
-The result of the step should provide output and be executable by an AI agent.
-If there is step numbering, formatting, or indexing - vote "No".
-If the step is not a simple action, or changes multiple things at once - vote "No".
-Steps should only change one thing at a time!
-If the step provides examples or suggestions - vote "No".
-If the step already exists in the previous steps - vote "No".
-If there is already a step that accomplishes the final output generation and all conditions of the task are satisfied - vote "Yes".
-If the plan is deemed sufficiently detailed and complete - vote "End".
-Steps should NOT repeat. Reject anything containing repeated steps.
+Vote with a simple "Yes", "No", or "End" verbatim on whether the proposed step(s) should be added to the plan.
+
+Voting rules:
+- A proposed step of "End" means the proposer believes the plan is complete. If you agree the plan covers all requirements of the task, vote "Yes". If the plan is incomplete, vote "No".
+- If the plan is already complete and the proposed step is NOT "End", vote "End" to signal that no more steps are needed.
+- The step must directly contribute to completing the task and be actionable by a single AI agent without further decomposition.
+- The step must produce a meaningful change to the running state.
+- If there is step numbering, formatting, or indexing - vote "No".
+- If the step is not atomic or changes multiple things at once - vote "No".
+- If the step provides examples or suggestions instead of a concrete action - vote "No".
+- SEMANTIC DUPLICATE CHECK: If a proposed step accomplishes the same outcome as any existing step — even if worded differently — vote "No". Two steps are duplicates if executing both would be redundant.
+- If the step is too vague for an executor agent to act on without guessing intent - vote "No".
 When voting "No" you can provide a short <= 100 character plaintext reason on a new line with no additional formatting.
-"Yes" and "End" need to be verbatim with no other output.
-You can ONLY pick ONE option. Yes, No, or End.
-Do not vote End if the proposed step is to End - Vote Yes instead if you think that the plan is complete.
+"Yes" and "End" must be verbatim with no other output.
+You can ONLY pick ONE option: Yes, No, or End.
 
 Ensure that ALL following rules are followed for the proposed new step(s):
 {PLAN_RULES}

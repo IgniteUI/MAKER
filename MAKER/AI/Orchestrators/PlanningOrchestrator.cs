@@ -106,7 +106,7 @@ namespace MAKER.AI.Orchestrators
 
             var prompt = planTemplate
                 .Replace(TemplateVariables.Task, task)
-                .Replace(TemplateVariables.Steps, string.Join(Environment.NewLine, steps.Select(s => "- " + s.Task)))
+                .Replace(TemplateVariables.Steps, string.Join(Environment.NewLine, steps.Select(s => $"  <step>{s.Task}</step>")))
                 .Replace(TemplateVariables.PlanRules, rules)
                 .Replace(TemplateVariables.OutputFormat, format)
                 .Replace(TemplateVariables.PlanFormat, planFormat)
@@ -203,8 +203,18 @@ namespace MAKER.AI.Orchestrators
                 .Replace(TemplateVariables.PlanFormat, planFormat);
 
             prompt = ClearUnusedTemplateVariables(prompt);
-
-            return await RunVotingRound(k, prompt, planVotingClient, tools, mcpServers, cancellationToken);
+            try
+            {
+                return await RunVotingRound(k, prompt, planVotingClient, tools, mcpServers, cancellationToken);
+            }
+            catch (AIVoteException ex)
+            {
+                if (ex.Reason == VoteCancellationReason.Contentious)
+                {
+                    return (false, [ex.Message], new AIResponse());
+                }
+                throw;
+            }
         }
     }
 }
