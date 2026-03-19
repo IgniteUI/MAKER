@@ -129,7 +129,7 @@ public static class MakerApiEndpoints
     }
 }
 
-public record PlanRequest(string Prompt, int BatchSize = 2, int K = 10, int MaxSteps = 10);
-public record ExecuteRequest(string Prompt, string StepsJson, int BatchSize = 2, int K = 10);
+public record PlanRequest(string Prompt, int BatchSize = 3, int K = 10, int MaxSteps = 20);
+public record ExecuteRequest(string Prompt, string StepsJson, int BatchSize = 3, int K = 10);
 public record McpServerRequest(string Name, string Url, string? Description = null, string? ApiKey = null);
 public record FormatRequest(string Format);

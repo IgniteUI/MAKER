@@ -22,7 +22,7 @@ namespace MAKER.AI.Orchestrators
 
         private static readonly ConcurrentDictionary<string, string> _templateCache = new();
 
-        protected async Task<(bool Vote, IEnumerable<string> Reasons, AIResponse Usage)> RunVotingRound(int k, string prompt, IAIClient client, object? tools = null, List<MCPServerInfo>? mcpServers = null, CancellationToken cancellationToken = default)
+        protected async Task<(bool Vote, IEnumerable<string> Reasons, AIResponse Usage)> RunVotingRound(int k, string prompt, IAIClient client, object? tools = null, List<MCPServerInfo>? mcpServers = null, bool treatEndAsYes = false, CancellationToken cancellationToken = default)
         {
             int positive = 0;
             int negative = 0;
@@ -68,7 +68,14 @@ namespace MAKER.AI.Orchestrators
                         }
                         else if (voteResponse == AIResponses.End)
                         {
-                            end++;
+                            if (treatEndAsYes)
+                            {
+                                positive++;
+                            }
+                            else
+                            {
+                                end++;
+                            }
                         }
                         else
                         {

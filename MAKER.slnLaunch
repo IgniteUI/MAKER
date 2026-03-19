@@ -1,0 +1,15 @@
+[
+  {
+    "Name": "Quorum",
+    "Projects": [
+      {
+        "Path": "MAKER.McpServer\\MAKER.McpServer.csproj",
+        "Action": "Start"
+      },
+      {
+        "Path": "MAKER.WebApp\\MAKER.WebApp.csproj",
+        "Action": "StartWithoutDebugging"
+      }
+    ]
+  }
+]

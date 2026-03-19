@@ -35,7 +35,7 @@ namespace MAKER
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <returns>A list of steps representing the generated plan.</returns>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="batchSize"/>, <paramref name="k"/>, or <paramref name="maxSteps"/> is less than or equal to zero.</exception>
-        Task<IList<Step>> Plan(string prompt, int batchSize = 2, int k = 10, int maxSteps = 10, IList<Step>? prependSteps = null, List<IAIRedFlagValidator>? validators = null, object? tools = null, CancellationToken cancellationToken = default);
+        Task<IList<Step>> Plan(string prompt, int batchSize = 3, int k = 10, int maxSteps = 20, IList<Step>? prependSteps = null, List<IAIRedFlagValidator>? validators = null, object? tools = null, CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Executes a sequence of steps using the specified prompt and returns the resulting state as a string.
@@ -50,6 +50,6 @@ namespace MAKER
         /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
         /// <returns>The resulting state of the Step execution.</returns>
         /// <exception cref="ArgumentOutOfRangeException">Thrown when <paramref name="batchSize"/> or <paramref name="k"/> is less than or equal to zero.</exception>
-        Task<string> Execute(IList<Step> steps, string prompt, int batchSize = 2, int k = 10, List<IAIRedFlagValidator>? validators = null, object? tools = null, CancellationToken cancellationToken = default);
+        Task<string> Execute(IList<Step> steps, string prompt, int batchSize = 3, int k = 10, List<IAIRedFlagValidator>? validators = null, object? tools = null, CancellationToken cancellationToken = default);
     }
 }

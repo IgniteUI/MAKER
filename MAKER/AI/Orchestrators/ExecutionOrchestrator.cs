@@ -17,7 +17,7 @@ namespace MAKER.AI.Orchestrators
         public event Action<string>? OnStateChanged;
         #endregion
 
-        public async Task<string> Execute(IList<Step> steps, string prompt, string format, int batchSize = 2, int k = 10, List<IAIRedFlagValidator>? validators = null, object? tools = null, List<MCPServerInfo>? mcpServers = null, CancellationToken cancellationToken = default)
+        public async Task<string> Execute(IList<Step> steps, string prompt, string format, int batchSize = 3, int k = 10, List<IAIRedFlagValidator>? validators = null, object? tools = null, List<MCPServerInfo>? mcpServers = null, CancellationToken cancellationToken = default)
         {
             var completedSteps = new List<Step>();
             var stepsList = steps.ToList();
@@ -103,7 +103,7 @@ namespace MAKER.AI.Orchestrators
 
             prompt = ClearUnusedTemplateVariables(prompt);
 
-            var (vote, reasons, _) = await RunVotingRound(k, prompt, executionVotingClient, tools, mcpServers, cancellationToken);
+            var (vote, reasons, _) = await RunVotingRound(k, prompt, executionVotingClient, tools, mcpServers, cancellationToken: cancellationToken);
             return (vote, reasons);
         }
 

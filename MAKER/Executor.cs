@@ -58,7 +58,7 @@ namespace MAKER
         }
 
         /// <inheritdoc />
-        public async Task<IList<Step>> Plan(string prompt, int batchSize = 2, int k = 10, int maxSteps = 10, IList<Step>? prependSteps = null, List<IAIRedFlagValidator>? validators = null, object? tools = null, CancellationToken cancellationToken = default)
+        public async Task<IList<Step>> Plan(string prompt, int batchSize = 3, int k = 10, int maxSteps = 20, IList<Step>? prependSteps = null, List<IAIRedFlagValidator>? validators = null, object? tools = null, CancellationToken cancellationToken = default)
         {
             if (batchSize <= 0) throw new ArgumentOutOfRangeException($"{nameof(batchSize)} must be greater than zero");
             if (k <= 0) throw new ArgumentOutOfRangeException($"{nameof(k)} must be greater than zero");
@@ -68,7 +68,7 @@ namespace MAKER
         }
 
         /// <inheritdoc />
-        public async Task<string> Execute(IList<Step> steps, string prompt, int batchSize = 2, int k = 10, List<IAIRedFlagValidator>? validators = null, object? tools = null, CancellationToken cancellationToken = default)
+        public async Task<string> Execute(IList<Step> steps, string prompt, int batchSize = 3, int k = 10, List<IAIRedFlagValidator>? validators = null, object? tools = null, CancellationToken cancellationToken = default)
         {
             if (batchSize <= 0) throw new ArgumentOutOfRangeException($"{nameof(batchSize)} must be greater than zero");
             if (k <= 0) throw new ArgumentOutOfRangeException($"{nameof(k)} must be greater than zero");

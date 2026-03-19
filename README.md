@@ -46,7 +46,7 @@ Each orchestrator uses dedicated AI clients:
 **Task Decomposition:**
 The planning phase breaks down complex tasks into granular, executable steps through an iterative process:
 
-1. The Planning Client proposes a batch of steps (configurable batch size, default 2)
+1. The Planning Client proposes a batch of steps (configurable batch size, default 3)
 2. Each proposed step includes:
    - `Task`: Description of the step to perform
    - `RequiredSteps`: Dependencies (indices of prerequisite steps)
@@ -391,7 +391,7 @@ Each MCP tool call accepts optional parameters to control execution behavior:
 
 | Parameter | Default | Description |
 |---|---|---|
-| `batchSize` | `2` | Number of steps proposed/executed per round. Higher values (5-10) mean fewer rounds and faster execution but larger prompts and less granular control. Lower values (1-2) provide more control but slower execution. |
+| `batchSize` | `3` | Number of steps proposed/executed per round. Higher values (5-10) mean fewer rounds and faster execution but larger prompts and less granular control. Lower values (1-2) provide more control but slower execution. |
 | `k` | `10` | Voting consensus threshold — the margin by which one outcome must lead to win the vote. Higher values (15-20) require stronger agreement, using more tokens but increasing confidence. Lower values (3-5) enable faster decisions with less agreement. |
 
 These parameters are specified in natural language when calling the tools (see examples below).
@@ -413,7 +413,7 @@ Decomposes a task into a validated, ordered list of steps without executing them
 | Name | Type | Default | Description |
 |---|---|---|---|
 | `prompt` | `string` | — | The task or goal to plan |
-| `batchSize` | `integer` | `2` | Steps proposed per voting round |
+| `batchSize` | `integer` | `3` | Steps proposed per voting round |
 | `k` | `integer` | `10` | Consensus threshold |
 
 **Returns** — a JSON array:
@@ -445,7 +445,7 @@ Executes a step list produced by `plan`. Each batch is validated by the voting s
 |---|---|---|---|
 | `stepsJson` | `string` | — | JSON array from `plan` |
 | `prompt` | `string` | — | The original task (provides context) |
-| `batchSize` | `integer` | `2` | Steps executed per round |
+| `batchSize` | `integer` | `3` | Steps executed per round |
 | `k` | `integer` | `10` | Consensus threshold |
 
 **Returns** — the final accumulated result as a string.
@@ -459,7 +459,7 @@ Convenience tool that runs both phases in a single call. Streaming progress even
 | Name | Type | Default | Description |
 |---|---|---|---|
 | `prompt` | `string` | — | The task or goal |
-| `batchSize` | `integer` | `2` | Steps per round (planning and execution) |
+| `batchSize` | `integer` | `3` | Steps per round (planning and execution) |
 | `k` | `integer` | `10` | Consensus threshold |
 
 **Returns** — the final accumulated result as a string.
@@ -472,7 +472,7 @@ Ask your MCP client (e.g. Claude):
 
 > Use plan_and_execute to write a detailed comparison of REST vs GraphQL for a technical blog post.
 
-This uses the defaults: `batchSize=2` and `k=10`.
+This uses the defaults: `batchSize=3` and `k=10`.
 
 #### Inspect the plan before executing
 
@@ -490,7 +490,7 @@ For faster execution at the cost of less granular control:
 
 For critical tasks requiring maximum confidence:
 
-> Use plan_and_execute with batchSize=2 and k=15 to review this smart contract for security vulnerabilities.
+> Use plan_and_execute with batchSize=3 and k=15 to review this smart contract for security vulnerabilities.
 
 #### Low-cost exploratory task
 

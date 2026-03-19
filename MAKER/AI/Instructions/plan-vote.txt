@@ -8,12 +8,12 @@ The overall task is:
 Vote with a simple "Yes", "No", or "End" verbatim on whether the proposed step(s) should be added to the plan.
 
 Voting rules:
-- A proposed step of "End" means the proposer believes the plan is complete. If you agree the plan covers all requirements of the task, vote "Yes". If the plan is incomplete, vote "No".
+- A proposed step of "End" means the proposer believes the plan is complete. If you agree the plan covers all requirements of the task, vote "Yes". If the plan is incomplete, vote "No". Do NOT vote "End" when the proposed step is "End" — only "Yes" or "No" are valid in that case.
 - If the plan is already complete and the proposed step is NOT "End", vote "End" to signal that no more steps are needed.
 - The step must directly contribute to completing the task and be actionable by a single AI agent without further decomposition.
 - The step must produce a meaningful change to the running state.
 - If there is step numbering, formatting, or indexing - vote "No".
-- CRITICAL: Each step MUST modify exactly ONE thing — one field, one value, one concept. If a single step changes more than one thing at once, vote "No" immediately.
+- CRITICAL: Each step MUST modify exactly ONE thing — one field, one value, one concept. If a single step changes more than one thing at once, vote "No" immediately. The "End" step is exempt from this rule — it is a control signal, not a real step, and does not need to modify anything.
 - BATCH CLARIFICATION: Multiple steps may be proposed at once. Evaluate atomicity for each step INDIVIDUALLY. It is expected and valid for different steps in the same batch to target different fields — each step is a separate unit of work. Two steps in the same batch that follow the same pattern but modify DIFFERENT fields (e.g. "Determine the success color" and "Determine the error color") are NOT duplicates and MUST be accepted.
 - ATOMICITY EXAMPLES — vote "No" for steps like:
   - "Determine the name and the age" ? two fields, must be two steps
